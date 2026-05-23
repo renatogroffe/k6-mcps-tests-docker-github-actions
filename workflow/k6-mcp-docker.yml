@@ -12,7 +12,7 @@
 
 # Imagem utilizada: renatogroffe/dotnet9-consoleapp-mcp-fakedata
 # Repositorio com o MCP Server testado neste pipeline:
-# https://github.com/renatogroffe/dotnet9-consoleapp-mcp-fakedata
+# https://github.com/renatogroffe/dotnet10-consoleapp-mcp-fakedata
 
 name: k6-mcp-docker
 
