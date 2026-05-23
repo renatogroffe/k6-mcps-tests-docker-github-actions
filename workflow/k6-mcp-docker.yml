@@ -1,0 +1,94 @@
+# Build com o xk6 via container:
+# https://github.com/grafana/xk6#docker
+
+# Releases do k6
+# https://github.com/grafana/k6/releases
+
+# Extensão do k6 para MCP:
+# https://github.com/grafana/xk6-mcp
+
+# Extensão JavaScript para geração do report HTML:
+# https://code.benco.io/k6-reporter/
+
+# Imagem utilizada: renatogroffe/dotnet9-consoleapp-mcp-fakedata
+# Repositorio com o MCP Server testado neste pipeline:
+# https://github.com/renatogroffe/dotnet9-consoleapp-mcp-fakedata
+
+name: k6-mcp-docker
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+env:
+  LOAD_TESTS_SCRIPT: 'mcp-fakedata_test.js'
+  HTML_REPORT_K6: 'results-report.html'
+  TESTS_DIRECTORY: './tests'
+  XK6_VERSION: 'v1.5.0'
+  XK6_MCP_REPO: 'github.com/dgzlopes/xk6-mcp'
+  XK6_MCP_VERSION: 'v0.0.3'
+  CONCURRENT_USERS: '1'
+  ITERATIONS: '1'
+
+jobs:
+  Tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Exibir imagens e containers antes do build do k6
+        run: |
+          docker images
+          echo ''
+          docker ps -a
+
+      - name: Gerar o executável do k6 com suporte a MCP via container do xk6
+        run: |
+          cd ${{ env.TESTS_DIRECTORY }}
+          docker run --rm -u "$(id -u):$(id -g)" -v "${PWD}:/xk6" grafana/xk6 build ${{ env.XK6_VERSION }} \
+            --with ${{ env.XK6_MCP_REPO }}@${{ env.XK6_MCP_VERSION }}
+
+      - name: Exibir imagens e containers apos build do k6
+        run: |
+          docker images
+          echo ''
+          docker ps -a
+
+      - name: Testar executável do k6
+        run: |
+          cd ${{ env.TESTS_DIRECTORY }}
+          ./k6
+
+      - name: Executar script de testes do k6
+        run: |
+          cd ${{ env.TESTS_DIRECTORY }}
+          pwd
+          ls
+          ./k6 run ${{ env.LOAD_TESTS_SCRIPT }} --vus ${{ env.CONCURRENT_USERS }} --iterations ${{ env.ITERATIONS }}
+
+      - name: Exibir imagens e containers apos execucao do k6
+        if: always()
+        run: |
+          docker images
+          echo ''
+          docker ps -a
+
+      - name: Exibir arquivos gerados apos execucao dos testes
+        if: always()
+        run: |
+          cd ${{ env.TESTS_DIRECTORY }}
+          pwd
+          echo ' '
+          echo '** Arquivos/diretórios após a execução dos testes:'
+          ls -l
+
+      - name: Publicar relatorio HTML com os resultados dos testes
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: k6-html-report
+          path: ${{ env.TESTS_DIRECTORY }}/${{ env.HTML_REPORT_K6 }}
